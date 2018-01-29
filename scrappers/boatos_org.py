@@ -34,3 +34,32 @@ def find_links_from_search_page(url):
     links = [a['href'] for a in soup.select('.more-link')]
 
     return links
+
+
+def save_hoax(hoax):
+    payload = {'uuid': 'scrapper', 'content': hoax, 'category_id': 2}
+
+    return requests.post(
+        'https://api.fakenewsdetector.org/vote_by_content', json=payload)
+
+
+if __name__ == "__main__":
+    initial_page = 13
+    final_page = 40
+    print('Start scrapping boatos.org from page',
+        initial_page, 'to', final_page)
+    for page in range(initial_page, final_page):
+        print('Scrapping page', page)
+        links = find_links_from_search_page('http://www.boatos.org/page/' +
+                                            str(page) + '?s=%23boato')
+        print('> Found', len(links), 'links')
+
+        for link in links:
+            print('> Scrapping', link)
+            hoax = scrape_hoax(link)
+            if hoax and len(hoax) > 100:
+                print('>> Saving hoax:', hoax[:60])
+                result = save_hoax(hoax)
+                print('>> Result:', result)
+            else:
+                print('>> No hoax text found. Skipping...')

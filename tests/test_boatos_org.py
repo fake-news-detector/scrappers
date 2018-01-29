@@ -1,7 +1,7 @@
 import unittest
 import requests
 
-from scrappers.boatos_org import scrape_hoax, find_links_from_search_page
+from scrappers.boatos_org import scrape_hoax, find_links_from_search_page, save_hoax
 from tests.helpers import trim, load_fixture
 from unittest.mock import MagicMock
 from collections import namedtuple
@@ -86,3 +86,18 @@ class BoatosOrgTestCase(unittest.TestCase):
             'http://www.boatos.org/saude/febre-amarela-farsa-governo.html',
             'http://www.boatos.org/saude/propolis-mosquito-febre-amarela.html'
         ])
+
+    def test_save_hoax_on_api(self):
+        original_post = requests.post
+        requests.post = MagicMock()
+        save_hoax('liar liar pants on fire')
+
+        requests.post.assert_called_with(
+            'https://api.fakenewsdetector.org/vote_by_content',
+            json={
+                'uuid': 'scrapper',
+                'content': 'liar liar pants on fire',
+                'category_id': 2
+            })
+
+        requests.post = original_post
