@@ -8,6 +8,10 @@ def get_soup(url):
     return BeautifulSoup(page.text, 'html.parser')
 
 
+def should_ignore_paragraph(p):
+    return "Ps.:" in p or "PS:" in p or "PS.:" in p or "Se você quiser sugerir" in p
+
+
 def scrape_hoax(url):
     soup = get_soup(url)
 
@@ -17,7 +21,7 @@ def scrape_hoax(url):
     if len(paragraphs) == 0:
         paragraphs = [p.get_text() for p in soup.select('#content em')]
 
-    paragraphs = ["" if "Ps.:" in p else p for p in paragraphs]
+    paragraphs = ["" if should_ignore_paragraph(p) else p for p in paragraphs]
 
     hoax = " ".join(paragraphs)
 
@@ -46,8 +50,8 @@ def save_hoax(hoax):
 if __name__ == "__main__":
     initial_page = 13
     final_page = 40
-    print('Start scrapping boatos.org from page',
-        initial_page, 'to', final_page)
+    print('Start scrapping boatos.org from page', initial_page, 'to',
+          final_page)
     for page in range(initial_page, final_page):
         print('Scrapping page', page)
         links = find_links_from_search_page('http://www.boatos.org/page/' +
