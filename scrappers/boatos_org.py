@@ -1,6 +1,8 @@
 import requests
 from bs4 import BeautifulSoup
 import unicodedata
+from multiprocessing import Pool
+import pandas as pd
 
 
 def get_soup(url):
@@ -8,29 +10,34 @@ def get_soup(url):
     return BeautifulSoup(page.text, 'html.parser')
 
 
-def should_ignore_paragraph(p):
-    return "Ps.:" in p or "PS:" in p or "PS.:" in p or "Se você quiser sugerir" in p
+def should_ignore_paragraph(child):
+    parent = child.parent
+    if parent.name != 'p':
+        parent = parent.parent
+    p = parent.get_text()
+    return "Ps.:" in p or "PS:" in p or "PS.:" in p or "Se você quiser sugerir" in p
 
 
-def scrape_hoax(url):
-    soup = get_soup(url)
+def scrape_hoax(link):
+    print('> Scrapping', link)
+    soup = get_soup(link)
 
     paragraphs = [
         p.get_text() for p in soup.select('#content [style="color: #ff0000;"]')
     ]
     if len(paragraphs) == 0:
-        paragraphs = [p.get_text() for p in soup.select('#content em')]
-
-    paragraphs = ["" if should_ignore_paragraph(p) else p for p in paragraphs]
+        paragraphs = [p.get_text()
+                      if not should_ignore_paragraph(p) else ""
+                      for p in soup.select('#content em')]
 
     hoax = " ".join(paragraphs)
 
-    clean_hoax = unicodedata.normalize("NFKD", hoax)
+    clean_hoax = unicodedata.normalize("NFKD", hoax).strip()
 
-    if not clean_hoax.strip():
-        return None
+    time = soup.select_one('time[datetime]')
+    timestamp = pd.to_datetime(time['datetime'])
 
-    return clean_hoax
+    return {'link': link, 'timestamp': timestamp, 'hoax': clean_hoax}
 
 
 def find_links_from_search_page(url):
@@ -40,30 +47,27 @@ def find_links_from_search_page(url):
     return links
 
 
-def save_hoax(hoax):
-    payload = {'uuid': 'scrapper', 'content': hoax, 'category_id': 2}
-
-    return requests.post(
-        'https://api.fakenewsdetector.org/vote_by_content', json=payload)
+def scrape_search_for_links(page_index):
+    print('Scrapping page', page_index)
+    links = find_links_from_search_page('http://www.boatos.org/page/' +
+                                        str(page_index) + '?s=%23boato')
+    print('> Found', len(links), 'links for page', page_index)
+    return links
 
 
 if __name__ == "__main__":
-    initial_page = 13
-    final_page = 40
+    initial_page = 1
+    final_page = 97
     print('Start scrapping boatos.org from page', initial_page, 'to',
           final_page)
-    for page in range(initial_page, final_page):
-        print('Scrapping page', page)
-        links = find_links_from_search_page('http://www.boatos.org/page/' +
-                                            str(page) + '?s=%23boato')
-        print('> Found', len(links), 'links')
+    with Pool(5) as p:
+        all_links = p.map(scrape_search_for_links,
+                          range(initial_page, final_page))
+        all_links = [val for sublist in all_links for val in sublist]
+        print('> Found', len(all_links), 'total')
 
-        for link in links:
-            print('> Scrapping', link)
-            hoax = scrape_hoax(link)
-            if hoax and len(hoax) > 100:
-                print('>> Saving hoax:', hoax[:60])
-                result = save_hoax(hoax)
-                print('>> Result:', result)
-            else:
-                print('>> No hoax text found. Skipping...')
+        all_hoaxes = p.map(scrape_hoax, all_links)
+
+        df = pd.DataFrame(all_hoaxes)
+        df = df[df['hoax'].str.len() > 100]
+        df.to_csv("boatos.csv")
