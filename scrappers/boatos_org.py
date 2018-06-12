@@ -4,6 +4,9 @@ import unicodedata
 from multiprocessing import Pool
 import pandas as pd
 
+site = "hablillas.org"  # "boatos.org"
+search_query = '?s=%23rumor'  # '?s=%23boato'
+
 
 def get_soup(url):
     page = requests.get(url)
@@ -15,7 +18,8 @@ def should_ignore_paragraph(child):
     if parent.name != 'p':
         parent = parent.parent
     p = parent.get_text()
-    return "Ps.:" in p or "PS:" in p or "PS.:" in p or "Se você quiser sugerir" in p
+    return ("Ps.:" in p or "PS:" in p or "PS.:" in p or "Se você quiser sugerir" in p or
+            "Usted puede sugerir" in p or "Este artículo fue una sugerencia" in p)
 
 
 def scrape_hoax(link):
@@ -49,16 +53,16 @@ def find_links_from_search_page(url):
 
 def scrape_search_for_links(page_index):
     print('Scrapping page', page_index)
-    links = find_links_from_search_page('http://www.boatos.org/page/' +
-                                        str(page_index) + '?s=%23boato')
+    links = find_links_from_search_page('http://www.' + site + '/page/' +
+                                        str(page_index) + search_query)
     print('> Found', len(links), 'links for page', page_index)
     return links
 
 
 if __name__ == "__main__":
     initial_page = 1
-    final_page = 97
-    print('Start scrapping boatos.org from page', initial_page, 'to',
+    final_page = 8  # 97
+    print('Start scrapping', site, 'from page', initial_page, 'to',
           final_page)
     with Pool(5) as p:
         all_links = p.map(scrape_search_for_links,
@@ -70,4 +74,4 @@ if __name__ == "__main__":
 
         df = pd.DataFrame(all_hoaxes)
         df = df[df['hoax'].str.len() > 100]
-        df.to_csv("boatos.csv")
+        df.to_csv(site + ".csv")
