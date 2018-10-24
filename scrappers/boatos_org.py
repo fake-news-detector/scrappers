@@ -4,8 +4,8 @@ import unicodedata
 from multiprocessing import Pool
 import pandas as pd
 
-site = "hablillas.org"  # "boatos.org"
-search_query = '?s=%23rumor'  # '?s=%23boato'
+site = "boatos.org"  # "hablillas.org"
+search_query = '?s=%23boato'  # '?s=%23rumor'
 
 
 def get_soup(url):
@@ -35,6 +35,7 @@ def scrape_hoax(link):
                       for p in soup.select('#content em')]
 
     hoax = " ".join(paragraphs)
+    hoax = hoax.replace("Se inscreva no nosso canal no Youtube ", "")
 
     clean_hoax = unicodedata.normalize("NFKD", hoax).strip()
 
@@ -61,7 +62,7 @@ def scrape_search_for_links(page_index):
 
 if __name__ == "__main__":
     initial_page = 1
-    final_page = 8  # 97
+    final_page = 122  # 8
     print('Start scrapping', site, 'from page', initial_page, 'to',
           final_page)
     with Pool(5) as p:
